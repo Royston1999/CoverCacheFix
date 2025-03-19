@@ -9,7 +9,7 @@
   "packageVersion": "1.37.0_9064817954",
   "description": "fixes sprites never being destroyed when removed from cache",
   "dependencies": [],
-  "modFiles": [],
-  "libraryFiles": ["${binary}"],
+  "lateModFiles": ["${binary}"],
+  "libraryFiles": [],
   "fileCopies": []
 }
