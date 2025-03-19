@@ -1,0 +1,111 @@
+name: NDK build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'tag name'
+        required: true
+      bs_version:
+        description: 'bs version'
+        required: true
+  pull_request:
+    branches:
+        - 'master'
+        - 'main'
+        - 'dev/*'
+        - 'feat/*'
+        - 'fix/*'
+
+env:
+    module_id: covercachefix
+    qmod_name: CoverCacheFix
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      name: Checkout
+      with:
+        submodules: true
+        lfs: true
+
+    - uses: seanmiddleditch/gha-setup-ninja@v3
+
+    - name: Get QPM
+      uses: Fernthedev/qpm-action@v1
+      with:
+        resolve_ndk: true
+        #required
+        workflow_token: ${{secrets.GITHUB_TOKEN}}
+        restore: true # will run restore on download
+        cache: true #will cache dependencies
+
+    - name: Build
+      run: |
+        cd ${GITHUB_WORKSPACE}
+        qpm qmod manifest
+        pwsh -Command ./scripts/build.ps1
+    - name: Create Qmod
+      run: |
+        pwsh -Command ./scripts/createqmod.ps1 ${{ env.qmod_name }}_${{ github.event.inputs.version }}
+
+    - name: Get Library Name and Build ID
+      id: libname
+      run: |
+        cd ./build/
+        pattern="lib${module_id}*.so"
+        files=( $pattern )
+        echo "NAME=${files[0]}" >> ${GITHUB_OUTPUT}
+        echo "BUILD_ID=$(readelf -n ${files[0]} | grep -Po "(?<=Build ID: )[0-9a-f]+")" >> ${GITHUB_OUTPUT}
+
+    - name: Calculate SHA-256 of the qmod file
+      id: qmodsha
+      run: |
+        echo "QMOD_SHA=$(sha256sum ./${{ env.qmod_name }}_${{ github.event.inputs.version }}.qmod | grep -Po "^[0-9a-f]+")" >> ${GITHUB_OUTPUT}
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.libname.outputs.NAME }}
+        path: ./build/${{ steps.libname.outputs.NAME }}
+        if-no-files-found: error
+
+    - name: Upload debug artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: debug_${{ steps.libname.outputs.NAME }}
+        path: ./build/debug/debug_${{ steps.libname.outputs.NAME }}
+        if-no-files-found: error
+
+    - name: Upload qmod artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{env.qmod_name}}.qmod
+        path: ./${{ env.qmod_name }}_${{ github.event.inputs.version }}.qmod
+        if-no-files-found: error
+
+    # if we had a tag, we should make a release
+    - name: Upload release artifacts
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      id: upload_file_release
+      uses: softprops/action-gh-release@v0.1.15
+      with:
+        name: Slice Details ${{ github.event.inputs.version }} for Beat Saber ${{ github.event.inputs.bs_version }} 
+        tag_name: ${{ github.event.inputs.version }}
+        draft: true
+        generate_release_notes: true
+        body: |
+          
+          ### Build info
+        
+          SHA-256: ${{ steps.qmodsha.outputs.QMOD_SHA }}
+          Build ID: ${{ steps.libname.outputs.BUILD_ID }}
+        files: |
+          ./build/${{ steps.libname.outputs.NAME }}
+          ./build/debug/debug_${{ steps.libname.outputs.NAME }}
+          ./${{ env.qmod_name }}_${{ github.event.inputs.version }}.qmod
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
