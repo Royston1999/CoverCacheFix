@@ -9,13 +9,6 @@ on:
       bs_version:
         description: 'bs version'
         required: true
-  pull_request:
-    branches:
-        - 'master'
-        - 'main'
-        - 'dev/*'
-        - 'feat/*'
-        - 'fix/*'
 
 env:
     module_id: covercachefix

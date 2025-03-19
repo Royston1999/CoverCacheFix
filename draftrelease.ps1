@@ -10,4 +10,4 @@ $bsVersion = "v" + $modJson.packageVersion.split("_")[0]
  
 Write-Host "Initiating workflow for $modName $modVersion for Beat Saber $bsVersion"
 
-gh workflow run build-ndk.yml -f version=$modVersion -f bs_version=$bsVersion
+gh workflow run publish.yml -f version=$modVersion -f bs_version=$bsVersion
